@@ -1,0 +1,16 @@
+# This text provides raw data of factories.
+# All the lines blank or started with "#" will be ignored.
+
+# Firstly, one line with the number of factories
+9
+
+# Then {#factories} lines indicate the detail by "factory_id workers_number score (~[0,1])", factory_id must be continous.
+0 172 0.86 0.0723
+1 140 0.71 0.0976
+2 159 0.43 0.0734
+3 158 0.63 0.0822
+4 133 0.66 0.0622
+5 191 0.75 0.0729
+6 60 0.81 0.1013
+7 156 0.79 0.1462
+8 169 0.63 0.0358
