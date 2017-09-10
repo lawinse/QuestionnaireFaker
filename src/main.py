@@ -62,15 +62,11 @@ def generate():
 		sc = 0;
 		for wid in fac.workersId:
 			Worker.getById(wid).conduct();
-			wsc = Worker.getById(wid).qn.scoring();
-			sc += wsc
-			# print "Worker #%d (score: %0.2f) with selection:\t%s" % (wid,wsc,str(Worker.getById(wid).qn.ansList));
-		print ">>>>> Fac #%d with aver score: %0.2f" % (fac.id,sc*1.0/fac.workerCnt);
 
 def persistData():
 	joblib.dump((Factory.fBase, Worker.wBase,\
 		(Questionnaire.qBase, Questionnaire.relatedPairs,\
-			Questionnaire.relationMat,Questionnaire.qusCnt),(Question.MAX_OP, Question.MIN_OP)),\
+			Questionnaire.relationMat,Questionnaire.qusCnt,Questionnaire.minMaxSc),(Question.MAX_OP, Question.MIN_OP)),\
 	"../data/store.bin", compress = 3);
 
 def loadData():
@@ -79,13 +75,14 @@ def loadData():
 		return False
 	(Factory.fBase, Worker.wBase,\
 		(Questionnaire.qBase, Questionnaire.relatedPairs,\
-			Questionnaire.relationMat,Questionnaire.qusCnt),(Question.MAX_OP, Question.MIN_OP))\
+			Questionnaire.relationMat,Questionnaire.qusCnt,Questionnaire.minMaxSc),(Question.MAX_OP, Question.MIN_OP))\
 	= joblib.load("../data/store.bin")
 	return True
 
 def analysis():
 	from stats import Stats
 	Stats.genCsv();
+	Stats.scoring();
 
 def main():
 	if (not loadData()):
