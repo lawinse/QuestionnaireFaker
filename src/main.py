@@ -83,6 +83,7 @@ def analysis():
 	from stats import Stats
 	Stats.genCsv();
 	Stats.scoring();
+	Stats.getCor()
 
 def main():
 	if (not loadData()):
