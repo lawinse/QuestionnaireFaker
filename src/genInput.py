@@ -12,13 +12,13 @@ def main():
 			'# Firstly, one line with the number of factories\n')
 		f.write(str(facCnt)+ "\n")
 		f.write('\n# Then {#factories} lines indicate the detail by '+
-			'"factory_id workers_number score (~[0,1])", factory_id must be continous.\n')
+			'"factory_id workers_number score (~[0,1]) invalidRatio(~[0,1)) all_workers_cnt good_list bad_list", factory_id must be continous.\n')
 
 		for i in range(facCnt):
 			wCnt = random.randint(50,200);
 			fS = rangeGauss(0.4,1.0)
 			invR = rangeGauss(0,0.15)
-			f.write("%d %d %.2f %.4f" % (i, wCnt, fS, invR)+"\n")
+			f.write("%d %d %.2f %.4f 1000 [] []" % (i, wCnt, fS, invR)+"\n")
 
 	with open("../input/questions.txt", "w+") as f:
 		qusCnt = random.randint(70,120)

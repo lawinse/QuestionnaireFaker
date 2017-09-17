@@ -28,7 +28,7 @@ class Question:
 		# relation  1   ==>   0
 		# 2 ~ 2*2sigma   ==>  (MAX_OP - MIN_OP) ~ 2*2sigma 
 		minSigma = 0.5;
-		maxSigma = (cls.MAX_OP-cls.MIN_OP)*0.25
+		maxSigma = (cls.MAX_OP-cls.MIN_OP)*0.20
 
 		return 0.5+(1-re_abs)*(maxSigma-minSigma)
 
@@ -42,13 +42,13 @@ class Question:
 			center = Question.MIN_OP+(1-factoryScore)*(Question.MAX_OP-Question.MIN_OP);
 			if (self.score < 0):
 				center = Question.MAX_OP - center;
-			return Question.getGaussAns(center, (Question.MAX_OP-Question.MIN_OP)*0.25);
+			return Question.getGaussAns(center, (Question.MAX_OP-Question.MIN_OP)*0.2);
 	def fillWithSuggest(self, suggest, factoryScore):
 		if (self.score == 0) :
-			return Question.getGaussAns(suggest, (Question.MAX_OP-Question.MIN_OP)*0.5);
+			return Question.getGaussAns(suggest, (Question.MAX_OP-Question.MIN_OP)*0.45);
 		else:
 			center = suggest - (2*factoryScore-1)*self.score;
-			return Question.getGaussAns(center,(Question.MAX_OP-Question.MIN_OP)*0.15);
+			return Question.getGaussAns(center,(Question.MAX_OP-Question.MIN_OP)*0.1);
 
 	@classmethod
 	def getSuggest(cls, pairScore, relation, isInvalid):
@@ -69,11 +69,16 @@ class Questionnaire:
 	#calculable
 	minMaxSc = None;
 
-	def __init__(self, _id):
+	def __init__(self, _id,_wid):
 		self.id = _id;
 		self.score = 0;
 		self.qCnt = Questionnaire.qusCnt;
 		self.ansList = [0 for i in range(self.qCnt)];
+		self.workerId = _wid
+
+	def getWorker(self):
+		from factory import Worker
+		return Worker.getById(self.workerId);
 
 	@classmethod
 	def getMinMaxSc(cls):
@@ -125,6 +130,7 @@ class Questionnaire:
 
 
 		for (pair, val) in cls.relatedPairs.items():
+
 			a = pair[0];
 			b = pair[1];
 			score_a = cls.qBase[a].score;
@@ -154,7 +160,7 @@ class Questionnaire:
 						return False;
 				else:
 					for (k,v) in clusterRelation[cb].items():
-						clusterRelation[ca][k] = sgn(v)*sgn(val);
+						clusterRelation[ca][k] = sgn(v)*sgn(val)*sgn(clusterRelation[cb][b]*clusterRelation[ca][a]);
 						cluster[k] = ca;
 					clusterRelation.pop(cb);
 
@@ -181,6 +187,16 @@ class Questionnaire:
 		Q.addRelation(0,2,-5);
 		print Q.validateRelation();
 
+	def getNewFactoryScore(self, oldFs, qid):
+		fac = self.getWorker().getFactory();
+		bl,gl = fac.badList,fac.goodList;
+		if (qid in bl):
+			return min(1.0,oldFs*1.1);
+		elif (qid in gl):
+			return oldFs*0.9;
+		else:
+			return oldFs;
+
 
 	def fillIn(self, factoryScore, isInvalid = False):
 		unfilled = set([i for i in range(self.qCnt)]);
@@ -191,10 +207,11 @@ class Questionnaire:
 			unfilled.remove(beg)
 			while (not Q.empty()):
 				(cur,suggest) = Q.get();
+				fs = self.getNewFactoryScore(factoryScore, cur)
 				if suggest == None:
-					self.ansList[cur] = Questionnaire.qBase[cur].fillIndepent(factoryScore);
+					self.ansList[cur] = Questionnaire.qBase[cur].fillIndepent(fs);
 				else:
-					self.ansList[cur] = Questionnaire.qBase[cur].fillWithSuggest(suggest, factoryScore);
+					self.ansList[cur] = Questionnaire.qBase[cur].fillWithSuggest(suggest, fs);
 				if Questionnaire.relationMat.has_key(cur):
 					random.shuffle(Questionnaire.relationMat[cur])
 					for (k,v) in Questionnaire.relationMat[cur]:

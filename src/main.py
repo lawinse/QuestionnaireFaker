@@ -1,6 +1,7 @@
 # -*- coding:utf8 -*-
 from factory import *
 from sklearn.externals import joblib
+from stats import Stats
 
 def _readline(fs):
 	s = ""
@@ -47,8 +48,7 @@ def readInData():
 		facCnt = eval(_readline(f1))
 		for i in range(facCnt):
 			li = _readline(f1).split();
-			f = Factory(eval(li[0]), eval(li[1]), eval(li[2]));
-			f.invRatio = eval(li[3])
+			f = Factory(eval(li[0]), eval(li[1]), eval(li[2]),eval(li[3]), eval(li[4]), eval(li[5]), eval(li[6]));
 			f.workersId = [wid for wid in range(wCnt, wCnt+eval(li[1]))] 
 			Factory.addFactory(f)
 			for j in range(wCnt, wCnt+eval(li[1])):
@@ -58,32 +58,23 @@ def readInData():
 
 def generate():
 	for fac in Factory.fBase:
-		print ">>>>> Processing Fac #%d with %d workers (%.2f%% invalid) " % (fac.id, fac.workerCnt, fac.invRatio*100);
+		print ">>>>> Processing Fac #%d with %d workers (set %.2f%% invalid) " % (fac.id, fac.workerCnt, fac.invRatio*100);
 		sc = 0;
 		for wid in fac.workersId:
 			Worker.getById(wid).conduct();
 
 def persistData():
-	joblib.dump((Factory.fBase, Worker.wBase,\
-		(Questionnaire.qBase, Questionnaire.relatedPairs,\
-			Questionnaire.relationMat,Questionnaire.qusCnt,Questionnaire.minMaxSc),(Question.MAX_OP, Question.MIN_OP)),\
-	"../data/store.bin", compress = 3);
+	Stats.persistData();
 
 def loadData():
-	import os
-	if not os.path.exists("../data/store.bin"):
-		return False
-	(Factory.fBase, Worker.wBase,\
-		(Questionnaire.qBase, Questionnaire.relatedPairs,\
-			Questionnaire.relationMat,Questionnaire.qusCnt,Questionnaire.minMaxSc),(Question.MAX_OP, Question.MIN_OP))\
-	= joblib.load("../data/store.bin")
-	return True
+	return Stats.loadData();
 
 def analysis():
-	from stats import Stats
 	Stats.genCsv();
 	Stats.scoring();
 	Stats.getCor()
+	Stats.getDistribution()
+	Stats.queryAll();
 
 def main():
 	if (not loadData()):
