@@ -156,7 +156,7 @@ class Stats:
 		for wid in workersId:
 			wsc = Worker.getById(wid).qn.scoring();
 			sc += wsc
-
+		sc /= float(len(workersId))
 		def summarize(_item, _workersId):
 			li = Worker.__dict__[_item.upper()]
 			cnt = dict.fromkeys(li,0)
@@ -168,7 +168,7 @@ class Stats:
 
 		with open(fname, "w+") as f:
 			f.write("Basic Info of " + ("Factory #%d" %(fid) if fid >= 0 else "All Factories") + "\n\n")
-			f.write("[workerCnt]:%d\n[allWorkerCnt]:%d\n[invalidCnt]:%d\n[questionnaireScoring]%d\n" \
+			f.write("[workerCnt]:%d\n[allWorkerCnt]:%d\n[invalidCnt]:%d\n[questionnaireScoring]:%.2f\n" \
 				% (workerCnt, allWorkerCnt, invalidCnt, sc))
 			f.write("[GeneralInfo]:\n\t" + "\n\t".join(generalInfo) + "\n")
 			f.write("[Distribution]:\n\t")
