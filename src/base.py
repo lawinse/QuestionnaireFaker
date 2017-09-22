@@ -36,6 +36,9 @@ def getRandomByRangeRatio(li,ratio):
 
 def getListAver(li):
 	return sum(li)*1.0/len(li)
+	
+def diff2(a):
+	return abs(a[0]-a[1]);
 
 if __name__ == '__main__':
 	print rangeGuassWithCenter(3,1,2,6)

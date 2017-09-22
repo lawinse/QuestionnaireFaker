@@ -4,7 +4,8 @@ from factory import *
 import os
 from sklearn.externals import joblib
 from matplotlib import pyplot
-
+import numpy as np
+import sys
 
 
 class Stats:
@@ -58,36 +59,36 @@ class Stats:
 				# print "Worker #%d (score: %0.2f) with selection:\t%s" % (wid,wsc,str(Worker.getById(wid).qn.ansList));
 			print ">>>>> Fac #%d with aver score: %0.2f\n" % (fac.id,sc*1.0/fac.workerCnt);
 
+	@staticmethod
+	def getTopNCor(arr, rowvar, n, facId):
+		from Queue import PriorityQueue
+		cormat = np.corrcoef(arr, rowvar=rowvar);
+		if facId == None:
+			joblib.dump(cormat,"../data/cormat.bin",compress = 3);
+		pq = PriorityQueue();
+		for r in range(cormat.shape[0]):
+			for c in range(cormat.shape[1]):
+				if (c <= r):
+					continue;
+
+				if pq.qsize() < n:
+					pq.put((abs(cormat[r,c]),(r,c)))
+				else:
+					curMin = pq.get();
+					if curMin[0] > abs(cormat[r,c]):
+						pq.put(curMin)
+					else:
+						pq.put((abs(cormat[r,c]),(r,c)))
+		ansli = []
+		while not pq.empty():
+			ansli.append(pq.get())
+		ansli = [(item[1], cormat[item[1]]) for item in ansli][::-1]
+		return ansli
+
 	@classmethod
 	def getCor(cls):
-		import numpy as np
 
 		TOP_N = 20;
-
-		def getTopNCor(arr, rowvar, n, facId):
-			from Queue import PriorityQueue
-			cormat = np.corrcoef(arr, rowvar=rowvar);
-			if facId == None:
-				joblib.dump(cormat,"../data/cormat.bin",compress = 3);
-			pq = PriorityQueue();
-			for r in range(cormat.shape[0]):
-				for c in range(cormat.shape[1]):
-					if (c <= r):
-						continue;
-
-					if pq.qsize() < n:
-						pq.put((abs(cormat[r,c]),(r,c)))
-					else:
-						curMin = pq.get();
-						if curMin[0] > abs(cormat[r,c]):
-							pq.put(curMin)
-						else:
-							pq.put((abs(cormat[r,c]),(r,c)))
-			ansli = []
-			while not pq.empty():
-				ansli.append(pq.get())
-			ansli = [(item[1], cormat[item[1]]) for item in ansli][::-1]
-			return ansli
 
 		facSeperate = [[] for i in range(len(Factory.fBase))]
 		facTtl = []
@@ -99,11 +100,11 @@ class Stats:
 						continue;
 					facSeperate[fac.id].append(Worker.getById(wid).qn.ansList)
 					facTtl.append(Worker.getById(wid).qn.ansList)
-				facSeperate[fac.id] = getTopNCor(np.array(facSeperate[fac.id]),0,TOP_N, fac.id)
+				facSeperate[fac.id] = Stats.getTopNCor(np.array(facSeperate[fac.id]),0,TOP_N, fac.id)
 				printAndWriteFileLn(f,">>>>> Fac #%d with correlation ranking:" % (fac.id));
 				printAndWriteFileLn(f,"\n".join([("(%d,%d) --> %.3f" % (item[0][0], item[0][1], item[1])) for item in facSeperate[fac.id]]) + "\n");
 
-			facTtl = getTopNCor(np.array(facTtl),0,TOP_N,None)
+			facTtl = Stats.getTopNCor(np.array(facTtl),0,TOP_N,None)
 			joblib.dump((facSeperate,facTtl), "../data/topcor.bin", compress = 3);
 			printAndWriteFileLn(f, ">>>>> All fac with correlation ranking:");
 			printAndWriteFileLn(f, "\n".join([("(%d,%d) --> %.3f" % (item[0][0], item[0][1], item[1])) for item in facTtl]));
@@ -243,40 +244,90 @@ class Stats:
 
 	@classmethod
 	def invalidEvaluation(cls):
+		from sklearn import mixture
+		from sklearn.cluster import KMeans
+		import math
 		cls.loadData();
 
-		# InvalidEvaluator1:
-		evaluator = InvalidEvaluator1(threshold=0.5);
-		all_score = [];
-		valid_score = [];
-		invalid_score = [];
-		for fac in Factory.fBase:
-			for wid in fac.workersId:
+		def get_score(evaluator_):
+			all_score_ = [];
+			valid_score_ = [];
+			invalid_score_ = [];
+			evs_ = []
+			for wid in Factory.getAllWorkersId():
 				wkr = Worker.getById(wid);
-				ev = evaluator.evaluate(wkr);
+				ev = evaluator_.evaluate(wkr);
+				evs_.append(ev);
 				if wkr.isInvalid:
-					invalid_score.append(ev);
+					invalid_score_.append(ev);
 				else:
-					valid_score.append(ev);
-		all_score = invalid_score + valid_score;
+					valid_score_.append(ev);
+			all_score_ = invalid_score_ + valid_score_;
+			return all_score_,invalid_score_,valid_score_, evs_;
+
+		# InvalidEvaluator1:
+		curMax,curTn = (-sys.maxint, -1);
+		for tn in range (10,90):
+			# evaluator = InvalidEvaluator1(topN=50, threshold=0.0, binary=False);
+			evaluator = InvalidEvaluator1(topN=tn, threshold=0.0);
+			all_score,invalid_score,valid_score,evs = get_score(evaluator);
+			model = mixture.GaussianMixture(n_components = 2,covariance_type = 'full',n_init = 3);
+			model.fit([[item] for item in all_score]);
+			prob_prod = 0.0
+			for ev in evs:
+				prob_prod += math.log(diff2(model.predict_proba(ev)[0]))
+			if prob_prod > curMax:
+				curMax = prob_prod
+				curTn = tn;
+
+
+		all_score,invalid_score,valid_score,evs = get_score(evaluator.set(tn=curTn));
 		print "ALL_SCORE aver. %.2f,\nVALID_SCORE aver. %.2f\nINVALID_SCORE aver. %.2f" % \
 			(getListAver(all_score), getListAver(valid_score), getListAver(invalid_score))
 		print "valid_range:(%.2f, %.2f)\tinvalid_range:(%.2f,%.2f)" % (min(valid_score), max(valid_score),\
 				min(invalid_score),max(invalid_score));
 
 
-		pyplot.hist(all_score,200);
+		#GMM
+		model = mixture.GaussianMixture(n_components = 2,covariance_type = 'full',n_init = 10);
+
+		model.fit([[item] for item in all_score]);
+		miscnt = 0
+		ans = [0,0];
+		prob_prod = 0.0
+		for wid in Factory.getAllWorkersId():
+			wkr = Worker.getById(wid);
+			ev = evaluator.evaluate(wkr)
+			p = model.predict(ev)[0]
+			prob_prod += math.log(diff2(model.predict_proba(ev)[0]))
+			if wkr.isInvalid != p:
+				miscnt += 1;
+			ans[p] += 1;
+		print "prob_prod: ",prob_prod
+		print "Using GMM with (topN=%d) to predict: miss %d comparing to groud truth" % (curTn,min(miscnt, len(all_score)-miscnt));
+
+		sigma0 = model.covariances_[0,0]**0.5;
+		sigma1 = model.covariances_[1,0]**0.5;
+		mu0 = model.means_[0];
+		mu1 = model.means_[1];
+
+		pyplot.hist(all_score,100, normed=True);
 		pyplot.xlabel('Invalid-Value')
-		pyplot.ylabel('Count')
-		pyplot.title('Invalid value distribution')
+		pyplot.ylabel('Freq')
+		pyplot.title('Invalid value distribution with N(%.2f,%.2f), N(%.2f,%.2f)' % (mu0, sigma0, mu1, sigma1))
+		bins = [i for i in range(int(min(valid_score)), int(max(invalid_score)), 1)]
+		pyplot.plot(bins, model.weights_[0]/(np.sqrt(2*np.pi)*sigma0)*np.exp(-(bins-mu0)**2/(2*sigma0**2)), lw=2, c='r')
+		pyplot.plot(bins, model.weights_[1]/(np.sqrt(2*np.pi)*sigma1)*np.exp(-(bins-mu1)**2/(2*sigma1**2)), lw=2, c='y')
 		pyplot.show();
+
 
 class InvalidEvaluator1:
 	import sys
-	def __init__(self, topN=sys.maxint, threshold=0.5):
+	def __init__(self, topN=sys.maxint, threshold=0.5, binary=True):
 		self.relationList = []
 		self.topN = topN;
 		self.thd = threshold;
+		self.bin = binary;
 		for (a, rel_a) in Questionnaire.relationMat.items():
 			for (b, val) in rel_a:
 				if a > b:
@@ -284,6 +335,14 @@ class InvalidEvaluator1:
 				else:
 					self.relationList.append((-abs(val), val, a,b));
 		self.relationList.sort();
+	def set(self, tn=None, thd=None, binary=None):
+		if tn != None:
+			self.topN = tn;
+		if thd != None:
+			self.threshold = thd;
+		if binary!=None:
+			self.bin = binary;
+		return self;
 
 	def evaluate(self, wkr):      # the less, the better
 		qn = wkr.qn.ansList;
@@ -291,13 +350,37 @@ class InvalidEvaluator1:
 		for (minus_abs_val, val, a,b) in self.relationList[:self.topN]:
 			if (-minus_abs_val < self.thd):
 				break;
+			ret += (1 if self.bin else val) * abs(qn[a]-qn[b]);
+		return ret;
+
+class InvalidEvaluator2:
+	import sys
+	def __init__(self, topN=sys.maxint, threshold=0.5):
+		self.relationList = Stats.getTopNCor(np.array([Worker.getById(wid).qn.ansList for wid in Factory.getAllWorkersId()]),0,topN,None)
+		self.topN = topN;
+		self.thd = threshold;
+
+
+	def evaluate(self, wkr):      # the less, the better
+		qn = wkr.qn.ansList;
+		ret = 0;
+		for ((a,b),val) in self.relationList[:self.topN]:
+			if (abs(val) < self.thd):
+				break;
 			ret += val * abs(qn[a]-qn[b]);
 		return ret;
 
+	def set(self, tn=None, thd=None):
+		if tn != None:
+			self.topN = tn;
+		if thd != None:
+			self.threshold = thd;
+
+		return self;
 
 
 
 
 if __name__ == '__main__':
 	Stats.loadData();
-	Stats.queryQuestionPair(118,122)
+	Stats.invalidEvaluation();
