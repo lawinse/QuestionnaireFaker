@@ -252,6 +252,9 @@ class Stats:
 		from matplotlib import pyplot
 
 		pyplot.hist(all_score,200);
+		pyplot.xlabel('Invalid-Value')
+		pyplot.ylabel('Count')
+		pyplot.title('Invalid value distribution')
 		pyplot.show();
 
 class InvalidEvaluator1:
@@ -274,7 +277,7 @@ class InvalidEvaluator1:
 		for (minus_abs_val, val, a,b) in self.relationList[:self.topN]:
 			if (-minus_abs_val < self.thd):
 				break;
-			ret += val* abs(qn[a]-qn[b]);
+			ret += val * abs(qn[a]-qn[b]);
 		return ret;
 
 
