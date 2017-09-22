@@ -25,6 +25,12 @@ class Factory:
 	@classmethod
 	def getById(cls, fid):
 		return cls.fBase[fid];
+	@classmethod
+	def getAllWorkersId(cls):
+		ret = []
+		for fac in cls.fBase:
+			ret += [wid for wid in fac.workersId];
+		return ret;
 
 
 

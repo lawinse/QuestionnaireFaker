@@ -3,6 +3,7 @@
 from factory import *
 import os
 from sklearn.externals import joblib
+from matplotlib import pyplot
 
 
 
@@ -201,6 +202,19 @@ class Stats:
 	 		f.write("\n\t".join(["~ %d cov: %.3f" % (v,k) for (k,v) in li[:40]]))
 
 	@classmethod
+	def queryQuestionPair(cls, pa, pb):
+		from matplotlib.colors import LogNorm
+		corrcoef = joblib.load("../data/cormat.bin")[pa][pb];
+		palist = [Worker.getById(wid).qn.ansList[pa] for wid in Factory.getAllWorkersId()];
+		pblist = [Worker.getById(wid).qn.ansList[pb] for wid in Factory.getAllWorkersId()];
+		pyplot.hist2d(palist, pblist,bins=20, norm=LogNorm() , cmap = pyplot.get_cmap('binary'))
+		pyplot.colorbar();
+		pyplot.xlabel("Q#%d" % (pa));
+		pyplot.ylabel("Q#%d" % (pb));
+		pyplot.title('Realtionship between Q#%d and Q#%d -- corrcoef %.2f' % (pa,pb, corrcoef));
+		pyplot.show()
+
+	@classmethod
 	def queryWorker(cls, wid, fname):
 	 	wkr = Worker.getById(wid);
 	 	fac = wkr.getFactory();
@@ -249,7 +263,7 @@ class Stats:
 			(getListAver(all_score), getListAver(valid_score), getListAver(invalid_score))
 		print "valid_range:(%.2f, %.2f)\tinvalid_range:(%.2f,%.2f)" % (min(valid_score), max(valid_score),\
 				min(invalid_score),max(invalid_score));
-		from matplotlib import pyplot
+
 
 		pyplot.hist(all_score,200);
 		pyplot.xlabel('Invalid-Value')
@@ -285,4 +299,5 @@ class InvalidEvaluator1:
 
 
 if __name__ == '__main__':
-	Stats.invalidEvaluation();
+	Stats.loadData();
+	Stats.queryQuestionPair(118,122)
