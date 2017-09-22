@@ -164,10 +164,10 @@ class Questionnaire:
 						cluster[k] = ca;
 					clusterRelation.pop(cb);
 
-				if (cls.relationMat.has_key(a)):
-					cls.relationMat[a].append((b,val));
-				else:
-					cls.relationMat[a] = [(b,val)];
+			if (cls.relationMat.has_key(a)):
+				cls.relationMat[a].append((b,val));
+			else:
+				cls.relationMat[a] = [(b,val)];
 
 			if (cls.relationMat.has_key(b)):
 				cls.relationMat[b].append((a,val));

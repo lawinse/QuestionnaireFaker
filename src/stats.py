@@ -4,15 +4,21 @@ from factory import *
 import os
 from sklearn.externals import joblib
 
+
+
 class Stats:
+	IS_DATA_LOADED = False;
 	@classmethod
 	def loadData(cls):
+		if cls.IS_DATA_LOADED:
+			return True;
 		if not os.path.exists("../data/store.bin"):
 			return False
 		(Factory.fBase, Worker.wBase,\
 			(Questionnaire.qBase, Questionnaire.relatedPairs,\
 				Questionnaire.relationMat,Questionnaire.qusCnt,Questionnaire.minMaxSc),(Question.MAX_OP, Question.MIN_OP))\
 		= joblib.load("../data/store.bin")
+		cls.IS_DATA_LOADED = True;
 		return True
 
 	@classmethod
@@ -211,7 +217,7 @@ class Stats:
 
 	@classmethod
 	def queryAll(cls):
-	 	Stats.loadData();
+	 	cls.loadData();
 		for i in range(len(Factory.fBase)):
 			Stats.queryFactory(i,"../output/Queries/Factories/Factory#%d.txt" % i);
 		Stats.queryFactory(-1,"../output/Queries/Factories/AllFactories.txt");
@@ -220,5 +226,60 @@ class Stats:
 			Stats.queryQuestion(i, "../output/Queries/Questions/Q#%d.txt" % i);
 		for i in range(len(Worker.wBase)):
 			Stats.queryWorker(i, "../output/Queries/Workers/Worker#%d.txt" % i);
+
+	@classmethod
+	def invalidEvaluation(cls):
+		cls.loadData();
+
+		# InvalidEvaluator1:
+		evaluator = InvalidEvaluator1(threshold=0.5);
+		all_score = [];
+		valid_score = [];
+		invalid_score = [];
+		for fac in Factory.fBase:
+			for wid in fac.workersId:
+				wkr = Worker.getById(wid);
+				ev = evaluator.evaluate(wkr);
+				if wkr.isInvalid:
+					invalid_score.append(ev);
+				else:
+					valid_score.append(ev);
+		all_score = invalid_score + valid_score;
+		print "ALL_SCORE aver. %.2f,\nVALID_SCORE aver. %.2f\nINVALID_SCORE aver. %.2f" % \
+			(getListAver(all_score), getListAver(valid_score), getListAver(invalid_score))
+		print "valid_range:(%.2f, %.2f)\tinvalid_range:(%.2f,%.2f)" % (min(valid_score), max(valid_score),\
+				min(invalid_score),max(invalid_score));
+		from matplotlib import pyplot
+
+		pyplot.hist(all_score,200);
+		pyplot.show();
+
+class InvalidEvaluator1:
+	import sys
+	def __init__(self, topN=sys.maxint, threshold=0.5):
+		self.relationList = []
+		self.topN = topN;
+		self.thd = threshold;
+		for (a, rel_a) in Questionnaire.relationMat.items():
+			for (b, val) in rel_a:
+				if a > b:
+					continue;
+				else:
+					self.relationList.append((-abs(val), val, a,b));
+		self.relationList.sort();
+
+	def evaluate(self, wkr):      # the less, the better
+		qn = wkr.qn.ansList;
+		ret = 0;
+		for (minus_abs_val, val, a,b) in self.relationList[:self.topN]:
+			if (-minus_abs_val < self.thd):
+				break;
+			ret += val* abs(qn[a]-qn[b]);
+		return ret;
+
+
+
+
+
 if __name__ == '__main__':
-	Stats.queryAll();
+	Stats.invalidEvaluation();
