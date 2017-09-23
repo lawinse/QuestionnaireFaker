@@ -62,6 +62,7 @@ class Worker:
 		self.factoryId = _fid;
 		self.char = rangeGauss(-0.1,0.1);
 		self.isInvalid = Factory.getById(self.factoryId).isInvalid();
+		self.isInvalidMarked = 0;
 
 		# General
 		self.gender = 0;

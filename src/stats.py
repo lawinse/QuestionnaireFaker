@@ -46,8 +46,8 @@ class Stats:
 						wkr = Worker.getById(wid)
 						qn = wkr.qn;
 						gi = [str(wkr.__dict__[k]).replace(",","~") for k in generalInfo]
-						f.write(str(wid)+","+",".join([str(item) for item in qn.ansList] + gi + ["True" if not wkr.isInvalid else "False"])+"\n")
-						fttl.write(str(wid)+","+",".join([str(item) for item in qn.ansList] + gi + ["True" if not wkr.isInvalid else "False"])+"\n")
+						f.write(str(wid)+","+",".join([str(item) for item in qn.ansList] + gi + ["True" if not wkr.isInvalidMarked else "False"])+"\n")
+						fttl.write(str(wid)+","+",".join([str(item) for item in qn.ansList] + gi + ["True" if not wkr.isInvalidMarked else "False"])+"\n")
 
 	@classmethod
 	def scoring(cls):
@@ -96,7 +96,7 @@ class Stats:
 		with open("../output/correlation.txt","w+") as f:
 			for fac in Factory.fBase:
 				for wid in fac.workersId:
-					if (Worker.getById(wid).isInvalid):
+					if (Worker.getById(wid).isInvalidMarked):
 						continue;
 					facSeperate[fac.id].append(Worker.getById(wid).qn.ansList)
 					facTtl.append(Worker.getById(wid).qn.ansList)
@@ -118,7 +118,7 @@ class Stats:
 		with open("../output/distribution.txt","w+") as f:
 			for fac in Factory.fBase:
 				for wid in fac.workersId:
-					if (Worker.getById(wid).isInvalid):
+					if (Worker.getById(wid).isInvalidMarked):
 						continue;
 					for (qid, sel) in enumerate(Worker.getById(wid).qn.ansList):
 						facSeperate[fac.id][qid][sel] += 1
@@ -159,7 +159,7 @@ class Stats:
 			workersId = fac.workersId
 			workerCnt = fac.workerCnt
 			allWorkerCnt = fac.allWorkerCnt
-		invalidCnt = sum([int(Worker.getById(wid).isInvalid) for wid in workersId])
+		invalidCnt = sum([int(Worker.getById(wid).isInvalidMarked) for wid in workersId])
 		sc = 0;
 		for wid in workersId:
 			wsc = Worker.getById(wid).qn.scoring();
@@ -225,7 +225,7 @@ class Stats:
 	 	with open(fname, "w+") as f:
 	 		f.write(("Basic Info of Worker#%d" % wid) + "\n\n");
 	 		f.write("[Factory]: # %d\n" % fac.id )
-	 		f.write("[ValidOrNot]: %s\n" % ("False" if wkr.isInvalid else "True"));
+	 		f.write("[ValidOrNot]: %s\n" % ("False" if wkr.isInvalidMarked else "True"));
 	 		f.write("[GeneralInfo]:\n\t" + "\n\t".join(generalInfo) + "\n")
 	 		f.write("[Questionnaire]: scoring: %.2f\n" % qn.scoring())
 	 		f.write("\n".join(["Q%d: %d" % (i,ans) for (i, ans) in enumerate(qn.ansList)]))
@@ -267,11 +267,11 @@ class Stats:
 
 		# InvalidEvaluator1:
 		curMax,curTn = (-sys.maxint, -1);
-		for tn in range (10,90):
+		for tn in range (10,80):
 			# evaluator = InvalidEvaluator1(topN=50, threshold=0.0, binary=False);
-			evaluator = InvalidEvaluator1(topN=tn, threshold=0.0);
+			evaluator = InvalidEvaluator2(topN=tn, threshold=0.0);
 			all_score,invalid_score,valid_score,evs = get_score(evaluator);
-			model = mixture.GaussianMixture(n_components = 2,covariance_type = 'full',n_init = 3);
+			model = mixture.GaussianMixture(n_components = 2,covariance_type = 'full',n_init = 5);
 			model.fit([[item] for item in all_score]);
 			prob_prod = 0.0
 			for ev in evs:
@@ -320,6 +320,24 @@ class Stats:
 		pyplot.plot(bins, model.weights_[1]/(np.sqrt(2*np.pi)*sigma1)*np.exp(-(bins-mu1)**2/(2*sigma1**2)), lw=2, c='y')
 		pyplot.show();
 
+		if model.weights_[0] > model.weights_[1]:
+			needFlapped = False;
+		else:
+			needFlapped = True;
+		return (evaluator, model, needFlapped)
+
+	@classmethod
+	def markInvalid(cls):
+		if os.path.exists("../data/evaluator.bin"):
+			(evaluator, model, needFlapped) = joblib.load("../data/evaluator.bin");
+		else:
+			(evaluator, model, needFlapped) = Stats.invalidEvaluation();
+			joblib.dump((evaluator, model, needFlapped), "../data/evaluator.bin", compress=3);
+		for wid in Factory.getAllWorkersId():
+			wkr = Worker.getById(wid)
+			pred = model.predict(evaluator.evaluate(wkr))[0];
+			wkr.isInvalidMarked = ~pred if needFlapped else pred;
+
 
 class InvalidEvaluator1:
 	import sys
@@ -350,7 +368,7 @@ class InvalidEvaluator1:
 		for (minus_abs_val, val, a,b) in self.relationList[:self.topN]:
 			if (-minus_abs_val < self.thd):
 				break;
-			ret += (1 if self.bin else val) * abs(qn[a]-qn[b]);
+			ret += (sgn(val) if self.bin else val) * abs(qn[a]-qn[b]);
 		return ret;
 
 class InvalidEvaluator2:
@@ -383,4 +401,4 @@ class InvalidEvaluator2:
 
 if __name__ == '__main__':
 	Stats.loadData();
-	Stats.invalidEvaluation();
+	Stats.markInvalid();

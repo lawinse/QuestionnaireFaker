@@ -70,6 +70,8 @@ def loadData():
 	return Stats.loadData();
 
 def analysis():
+	Stats.markInvalid();
+
 	Stats.genCsv();
 	Stats.scoring();
 	Stats.getCor()
